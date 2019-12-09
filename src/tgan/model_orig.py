@@ -34,11 +34,10 @@ class TGANGenerator(Generator):
 
     def __init__(
         self,
-        encoding_dims=16,
+        encoding_dims=100,
         out_size=32,
-        out_channels=1,
+        out_channels=3,
         step_channels=64,
-        kernel_size=3,
         batchnorm=True,
         nonlinearity=None,
         last_nonlinearity=None,
@@ -49,33 +48,50 @@ class TGANGenerator(Generator):
             raise Exception(
                 "Target Image Size must be at least 16*16 and an exact power of 2"
             )
-        num_repeats = out_size.bit_length() - 3
+        num_repeats = out_size.bit_length() - 4
         self.ch = out_channels
         self.n = step_channels
         use_bias = not batchnorm
         nl = nn.LeakyReLU(0.2) if nonlinearity is None else nonlinearity
-        dpd = nn.CircularDepad2d((0, 1, 0, 1))  # Circular padding layer
         last_nl = nn.Tanh() if last_nonlinearity is None else last_nonlinearity
         model = []
         d = int(self.n * (2 ** num_repeats))
-
-        model.append(
-            nn.Sequential(
-                nn.ConvTranspose2d(self.encoding_dims, d, 2, 1, 0, bias=use_bias),
-                nl,
-            )
-        )
-        for i in range(num_repeats):
+        if batchnorm is True:
             model.append(
                 nn.Sequential(
-                    nn.ConvTranspose2d(d, d // 2, kernel_size, 2, 0,
-                        bias=use_bias), dpd, nl
+                    nn.ConvTranspose2d(self.encoding_dims, d, 4, 1, 0, bias=use_bias),
+                    nn.BatchNorm2d(d),
+                    nl,
                 )
             )
-            d = d // 2
+            for i in range(num_repeats):
+                model.append(
+                    nn.Sequential(
+                        nn.ConvTranspose2d(d, d // 2, 4, 2, 1, bias=use_bias),
+                        nn.BatchNorm2d(d // 2),
+                        nl,
+                    )
+                )
+                d = d // 2
+        else:
+            model.append(
+                nn.Sequential(
+                    nn.ConvTranspose2d(self.encoding_dims, d, 4, 1, 0, bias=use_bias),
+                    nl,
+                )
+            )
+            for i in range(num_repeats):
+                model.append(
+                    nn.Sequential(
+                        #nn.ConvTranspose2d(d, d // 2, 4, 2, 1, bias=use_bias), nl
+                        nn.ConvTranspose2d(d, d // 2, 4, 2, 0, bias=use_bias), nl
+                    )
+                )
+                d = d // 2
 
         model.append(
-            nn.Sequential(nn.ConvTranspose2d(d, self.ch, kernel_size, 2, 0, bias=True), dpd, last_nl)
+            #nn.Sequential(nn.ConvTranspose2d(d, self.ch, 4, 2, 1, bias=True), last_nl)
+            nn.Sequential(nn.ConvTranspose2d(d, self.ch, 4, 2, 0, bias=True), last_nl)
         )
         self.model = nn.Sequential(*model)
         self._weight_initializer()
@@ -126,7 +142,6 @@ class TGANDiscriminator(Discriminator):
         in_size=32,
         in_channels=3,
         step_channels=64,
-        kernel_size=3,
         batchnorm=True,
         nonlinearity=None,
         last_nonlinearity=None,
@@ -137,26 +152,34 @@ class TGANDiscriminator(Discriminator):
             raise Exception(
                 "Input Image Size must be at least 16*16 and an exact power of 2"
             )
-        num_repeats = in_size.bit_length() - 3
+        num_repeats = in_size.bit_length() - 4
         self.decoding_dims = decoding_dims
         self.n = step_channels
         use_bias = not batchnorm
         nl = nn.LeakyReLU(0.2) if nonlinearity is None else nonlinearity
         last_nl = nn.LeakyReLU(0.2) if last_nonlinearity is None else last_nonlinearity
         d = self.n
-        pd = nn.CircularPad2d((0, 1, 0, 1))  # Circular padding layer
-        model = [nn.Sequential(pd, nn.Conv2d(self.input_dims, d, kernel_size, 2, 0, bias=True), nl)]
-
-        for i in range(num_repeats):
-            model.append(
-                nn.Sequential(pd, nn.Conv2d(d, d * 2, kernel_size, 2, 0, bias=use_bias), nl)
-            )
-            d *= 2
-
+        #model = [nn.Sequential(nn.Conv2d(self.input_dims, d, 4, 2, 1, bias=True), nl)]
+        model = [nn.Sequential(nn.Conv2d(self.input_dims, d, 4, 2, 0, bias=True), nl)]
+        if batchnorm is True:
+            for i in range(num_repeats):
+                model.append(
+                    nn.Sequential(
+                        nn.Conv2d(d, d * 2, 4, 2, 1, bias=use_bias),
+                        nn.BatchNorm2d(d * 2),
+                        nl,
+                    )
+                )
+                d *= 2
+        else:
+            for i in range(num_repeats):
+                model.append(
+                    #nn.Sequential(nn.Conv2d(d, d * 2, 4, 2, 1, bias=use_bias), nl)
+                    nn.Sequential(nn.Conv2d(d, d * 2, 4, 2, 0, bias=use_bias), nl)
+                )
+                d *= 2
+        self.disc = nn.Sequential(nn.Conv2d(d, self.decoding_dims, 4, 1, 0, bias=use_bias), last_nl)
         self.model = nn.Sequential(*model)
-
-        self.disc = nn.Sequential(nn.Conv2d(d, self.decoding_dims, 2, 1, 0, bias=use_bias), last_nl)
-
         self._weight_initializer()
 
     def forward(self, x, feature_matching=False):
