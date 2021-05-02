@@ -1,8 +1,6 @@
 from math import ceil, log2
 
 import torch.nn as nn
-import torch.nn.functional as F
-
 from torchgan.models import Discriminator, Generator
 
 #__all__ = ["TDCGANGenerator", "TDCGANDiscriminator"]

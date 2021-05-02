@@ -9,7 +9,6 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
-from model import Generator, Discriminator
 from .tgan import TGANGenerator, TGANDiscriminator
 
 
@@ -102,7 +101,7 @@ print(netD)
 # Loss function
 criterion = nn.BCELoss()
 
-# Auxiliary data 
+# Auxiliary data
 fixed_noise = torch.randn(opt.batchSize, nz, 1, 1, device=device)
 real_label = 1
 fake_label = 0
