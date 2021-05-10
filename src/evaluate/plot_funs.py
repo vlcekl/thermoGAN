@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
+from matplotlib import cm, colors
+from mpl_toolkits.mplot3d import Axes3D
 import cycler
 
 def plot_ternary(data, labels, classes = None, class_names = None, size=10, plt_title = None, legend_title = None):
@@ -124,3 +126,75 @@ def plot_ternary_continuum(data, labels, size=10, plt_title = None, legend_title
         # erase unused subplots
         for ia in range(len(triplets), nrows*ncols):
             axes[ia].axis('off')
+
+
+def plot_spherical(data, labels, psize=2):
+    # Create a sphere
+    r = 1
+    pi = np.pi
+    cos = np.cos
+    sin = np.sin
+    phi, theta = np.mgrid[0.0:pi/2:100j, 0.0:pi/2:100j]
+    x = r*sin(phi)*cos(theta)
+    y = r*sin(phi)*sin(theta)
+    z = r*cos(phi)
+    
+    #Import data
+    xx, yy, zz = np.hsplit(data[:,:3], 3) 
+    
+    #Set colours and render
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    ax.scatter([0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], c='k')
+    ax.plot([0, 0], [0, 0], [0, 1], c='k')
+    ax.plot([0, 0], [0, 1], [0, 0], c='k')
+    ax.plot([0, 1], [0, 0], [0, 0], c='k')
+    
+    #ax.plot_surface(x, y, z, rstride=1, cstride=1, color='c', alpha=0.6, linewidth=0)
+    ax.scatter(x, y, z, color='k', alpha=0.2, s=0.1)
+    
+    # Plot vectors on the sphere surface
+    ax.scatter(xx, yy, zz, c=labels, s=psize)
+    
+    # Plot class centroids
+    cents = []
+    for c in np.unique(labels):
+        index = np.where(labels == c)
+        xc = np.sqrt(np.mean(data[index, 0]**2))
+        yc = np.sqrt(np.mean(data[index, 1]**2))
+        zc = np.sqrt(np.mean(data[index, 2]**2))
+        cents.append([xc, yc, zc, c])
+    cents = np.array(cents)*1.02
+    ax.scatter(cents[:,0], cents[:,1], cents[:,2], color="red", s=20)
+
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    ax.set_zlim([0,1])
+    
+
+def plot_tetrahedron(data_out, labels_out):
+
+    #Import data
+    data = data_out[:,:4]**2
+    a = data[:, 0]
+    b = data[:, 1]
+    c = data[:, 2]
+    xx = 0.5 * ( 2.*b+c ) / ( a+b+c )*1
+    yy = 0.5*np.sqrt(3) * c / (a+b+c)*1
+    zz = data[:, 3]
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+    #ax.scatter([0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], c='k')
+    ax.plot([0, 1], [0, 0], [0, 0], c='k')
+    ax.plot([0, 0.5], [0, np.sqrt(1 - 0.5**2)], [0, 0], c='k')
+    ax.plot([1, 0.5], [0, np.sqrt(1 - 0.5**2)], [0, 0], c='k')
+
+    # Plot vectors on the sphere surface
+    ax.scatter(xx, yy, zz, c=labels_out, s=2)
+
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    ax.set_zlim([0,1])
